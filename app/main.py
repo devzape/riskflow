@@ -16,3 +16,7 @@ def root():
     return {"message": "RiskFlow API running"}
 
 Base.metadata.create_all(bind=engine)
+
+from app.routers import auth, accounts, transactions, risk_rules, alerts, analytics
+
+app.include_router(analytics.router)
