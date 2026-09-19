@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.risk_rule import RiskRule
@@ -36,7 +36,7 @@ def _rule_triggers(db: Session, rule: RiskRule, transaction: Transaction) -> boo
         return transaction.amount >= rule.threshold
 
     if rule.name == "frecuencia_sospechosa":
-        window_start = datetime.utcnow() - timedelta(minutes=10)
+        window_start = datetime.now(timezone.utc) - timedelta(minutes=10)
         count = (
             db.query(Transaction)
             .filter(
