@@ -8,8 +8,10 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionOut
 from app.services.deps import get_current_user
+from app.services.risk_engine import evaluate_transaction
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
+
 
 @router.post("/", response_model=TransactionOut)
 def create_transaction(
@@ -41,7 +43,13 @@ def create_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+
+    # Evaluar la transacción contra las reglas de riesgo activas
+    evaluate_transaction(db, transaction)
+    db.refresh(transaction)
+
     return transaction
+
 
 @router.get("/", response_model=List[TransactionOut])
 def list_my_transactions(
