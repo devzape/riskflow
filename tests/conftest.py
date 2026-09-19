@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 from app.database import Base, get_db
 from app.main import app
 
-TEST_DATABASE_URL = "postgresql://postgres:snmy@localhost:5432/riskflow_test"
+import os
+
+TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:TU_CONTRASEÑA_LOCAL@localhost:5432/riskflow_test")
 
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
