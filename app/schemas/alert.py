@@ -11,3 +11,8 @@ class AlertOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AlertExplanation(BaseModel):
+    alert_id: int
+    explanation: str
