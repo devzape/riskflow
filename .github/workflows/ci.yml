@@ -40,4 +40,5 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/riskflow_test
           SECRET_KEY: test-secret-key
+          GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY || 'test-google-api-key' }}"
         run: python -m pytest -v
