@@ -1,4 +1,9 @@
-# RiskFlow
+# RiskFlow 🛡️
+
+![Render Deployment](https://img.shields.io/badge/Status-Live-brightgreen?style=for-the-badge&logo=render)
+
+🚀 **Demo en vivo (API):** [https://riskflow-o3ol.onrender.com](https://riskflow-o3ol.onrender.com)  
+📄 **Documentación Interactiva (Swagger UI):** [https://riskflow-o3ol.onrender.com/docs](https://riskflow-o3ol.onrender.com/docs)
 
 Backend fintech con motor de detección de fraude en tiempo real, analytics de transacciones y explicación de alertas con IA.
 
