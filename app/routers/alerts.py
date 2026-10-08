@@ -26,9 +26,9 @@ def list_alerts(
 
 
 @router.get("/{alert_id}/explain", response_model=AlertExplanation)
-def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
+async def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
     """Obtiene la explicación generada por IA para una alerta específica."""
-    # Realiza un JOIN para traer la alerta, su transacción y regla en una única consulta
+    # Trae la alerta, su transacción y regla asociada en una sola consulta SQL (JOIN)
     alert = (
         db.query(Alert)
         .options(
@@ -42,7 +42,7 @@ def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
     if not alert:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
 
-    # Validación preventiva de relaciones para evitar errores 500
+    # Validación preventiva de relaciones para evitar errores HTTP 500
     if not alert.transaction or not alert.rule:
         raise HTTPException(
             status_code=422,
@@ -61,5 +61,6 @@ def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
         "threshold": str(alert.rule.threshold),
     }
 
-    explanation = explain_alert(transaction_data, rule_data)
+    # Llamada asíncrona a la función refactorizada con Gemini
+    explanation = await explain_alert(transaction_data, rule_data)
     return {"alert_id": alert_id, "explanation": explanation}
