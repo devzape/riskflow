@@ -124,14 +124,4 @@ Para ejecutar la suite de tests locales:
 python -m pytest -v
 ```
 
----
-
-## Roadmap
-
-- [ ] Reglas de riesgo basadas en Machine Learning (detección de anomalías de comportamiento).
-- [ ] Dashboard interactivo en frontend para visualización de métricas y alertas.
-- [ ] Sistema de notificaciones en tiempo real (WebSockets / Email) para alertas de severidad alta.
-
----
-
 Proyecto de portafolio creado por **[Benjamín Morales](https://github.com/devzape)**.
