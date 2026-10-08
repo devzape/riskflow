@@ -1,41 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.alert import Alert
-from app.models.transaction import Transaction
-from app.models.risk_rule import RiskRule
 from app.schemas.alert import AlertOut, AlertExplanation
 from app.services.ai_explainer import explain_alert
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
-@router.get("/", response_model=List[AlertOut])
-def list_alerts(db: Session = Depends(get_db)):
-    return db.query(Alert).order_by(Alert.created_at.desc()).all()
+@router.get("/", response_model=list[AlertOut])
+def list_alerts(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Retorna la lista de alertas ordenadas por fecha reciente con paginación."""
+    return (
+        db.query(Alert)
+        .order_by(Alert.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/{alert_id}/explain", response_model=AlertExplanation)
 def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    """Obtiene la explicación generada por IA para una alerta específica."""
+    # Realiza un JOIN para traer la alerta, su transacción y regla en una única consulta
+    alert = (
+        db.query(Alert)
+        .options(
+            joinedload(Alert.transaction),
+            joinedload(Alert.rule)
+        )
+        .filter(Alert.id == alert_id)
+        .first()
+    )
+
     if not alert:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
 
-    transaction = db.query(Transaction).filter(Transaction.id == alert.transaction_id).first()
-    rule = db.query(RiskRule).filter(RiskRule.id == alert.rule_id).first()
+    # Validación preventiva de relaciones para evitar errores 500
+    if not alert.transaction or not alert.rule:
+        raise HTTPException(
+            status_code=422,
+            detail="La alerta no cuenta con una transacción o regla válida asociada",
+        )
 
     transaction_data = {
-        "amount": str(transaction.amount),
-        "origin_account_id": transaction.origin_account_id,
-        "destination_account_id": transaction.destination_account_id,
-        "timestamp": transaction.timestamp.isoformat(),
+        "amount": str(alert.transaction.amount),
+        "origin_account_id": alert.transaction.origin_account_id,
+        "destination_account_id": alert.transaction.destination_account_id,
+        "timestamp": alert.transaction.timestamp.isoformat(),
     }
     rule_data = {
-        "name": rule.name,
-        "description": rule.description,
-        "threshold": str(rule.threshold),
+        "name": alert.rule.name,
+        "description": alert.rule.description,
+        "threshold": str(alert.rule.threshold),
     }
 
     explanation = explain_alert(transaction_data, rule_data)
