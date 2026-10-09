@@ -38,21 +38,19 @@ Regla que se disparó:
 
     try:
         client = _get_client()
-        
-        # Llamada asíncrona a la API de Gemini (no bloquea FastAPI)
+
         response = await client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.2, # Temperatura baja para mayor consistencia objetiva
+                temperature=0.2,
             ),
         )
         return response.text.strip()
 
     except Exception as exc:
         logger.error("Error al generar la explicación con Gemini API: %s", exc)
-        # Respuesta de contingencia si falla la llamada a la IA
         return (
             f"La transacción superó el umbral de {rule.get('threshold', 'N/A')} "
             f"configurado en la regla '{rule.get('name', 'N/A')}', "

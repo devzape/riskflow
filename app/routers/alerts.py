@@ -1,66 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
 
 from app.database import get_db
 from app.models.alert import Alert
+from app.models.transaction import Transaction
+from app.models.account import Account
+from app.models.risk_rule import RiskRule
+from app.models.user import User
 from app.schemas.alert import AlertOut, AlertExplanation
 from app.services.ai_explainer import explain_alert
+from app.services.deps import get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
-@router.get("/", response_model=list[AlertOut])
+@router.get("/", response_model=List[AlertOut])
 def list_alerts(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Retorna la lista de alertas ordenadas por fecha reciente con paginación."""
+    account_ids = [a.id for a in db.query(Account).filter(Account.user_id == current_user.id).all()]
     return (
         db.query(Alert)
+        .join(Transaction, Alert.transaction_id == Transaction.id)
+        .filter(Transaction.origin_account_id.in_(account_ids))
         .order_by(Alert.created_at.desc())
-        .offset(skip)
-        .limit(limit)
         .all()
     )
 
 
 @router.get("/{alert_id}/explain", response_model=AlertExplanation)
-async def explain_alert_endpoint(alert_id: int, db: Session = Depends(get_db)):
-    """Obtiene la explicación generada por IA para una alerta específica."""
-    # Trae la alerta, su transacción y regla asociada en una sola consulta SQL (JOIN)
-    alert = (
-        db.query(Alert)
-        .options(
-            joinedload(Alert.transaction),
-            joinedload(Alert.rule)
-        )
-        .filter(Alert.id == alert_id)
-        .first()
-    )
-
+async def explain_alert_endpoint(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
 
-    # Validación preventiva de relaciones para evitar errores HTTP 500
-    if not alert.transaction or not alert.rule:
-        raise HTTPException(
-            status_code=422,
-            detail="La alerta no cuenta con una transacción o regla válida asociada",
-        )
+    transaction = db.query(Transaction).filter(Transaction.id == alert.transaction_id).first()
+
+    origin_account = db.query(Account).filter(Account.id == transaction.origin_account_id).first()
+    if origin_account.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tenés acceso a esta alerta")
+
+    rule = db.query(RiskRule).filter(RiskRule.id == alert.rule_id).first()
 
     transaction_data = {
-        "amount": str(alert.transaction.amount),
-        "origin_account_id": alert.transaction.origin_account_id,
-        "destination_account_id": alert.transaction.destination_account_id,
-        "timestamp": alert.transaction.timestamp.isoformat(),
+        "amount": str(transaction.amount),
+        "origin_account_id": transaction.origin_account_id,
+        "destination_account_id": transaction.destination_account_id,
+        "timestamp": transaction.timestamp.isoformat(),
     }
     rule_data = {
-        "name": alert.rule.name,
-        "description": alert.rule.description,
-        "threshold": str(alert.rule.threshold),
+        "name": rule.name,
+        "description": rule.description,
+        "threshold": str(rule.threshold),
     }
 
-    # Llamada asíncrona a la función refactorizada con Gemini
     explanation = await explain_alert(transaction_data, rule_data)
     return {"alert_id": alert_id, "explanation": explanation}
