@@ -19,11 +19,24 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    origin = db.query(Account).filter(Account.id == data.origin_account_id).first()
-    destination = db.query(Account).filter(Account.id == data.destination_account_id).first()
+    origin = (
+        db.query(Account)
+        .filter(Account.id == data.origin_account_id)
+        .with_for_update()
+        .first()
+    )
+    destination = (
+        db.query(Account)
+        .filter(Account.id == data.destination_account_id)
+        .with_for_update()
+        .first()
+    )
 
     if not origin or not destination:
         raise HTTPException(status_code=404, detail="Cuenta origen o destino no encontrada")
+
+    if origin.id == destination.id:
+        raise HTTPException(status_code=400, detail="La cuenta origen y destino no pueden ser la misma")
 
     if origin.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="La cuenta origen no te pertenece")
@@ -44,7 +57,6 @@ def create_transaction(
     db.commit()
     db.refresh(transaction)
 
-    # Evaluar la transacción contra las reglas de riesgo activas
     evaluate_transaction(db, transaction)
     db.refresh(transaction)
 
