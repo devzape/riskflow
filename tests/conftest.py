@@ -1,14 +1,35 @@
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
-
-from app.database import Base, get_db
-from app.main import app
-
 import os
 
-TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:TU_CONTRASEÑA_LOCAL@localhost:5432/riskflow_test")
+import pytest
+from dotenv import load_dotenv
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import sessionmaker
+
+load_dotenv()
+
+from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
+
+# Los tests usan SU PROPIA base. En CI, DATABASE_URL ya apunta a riskflow_test.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+
+if not TEST_DATABASE_URL:
+    pytest.exit(
+        "Falta TEST_DATABASE_URL. Definila en el .env apuntando a una base de test "
+        "(por ejemplo .../riskflow_test).",
+        returncode=2,
+    )
+
+_db_name = make_url(TEST_DATABASE_URL).database or ""
+if "test" not in _db_name.lower():
+    pytest.exit(
+        f"Por seguridad, los tests solo corren contra bases con 'test' en el nombre "
+        f"(esta es '{_db_name}'). Los tests borran todas las tablas al terminar. "
+        "Definí TEST_DATABASE_URL apuntando a una base de test.",
+        returncode=2,
+    )
 
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
