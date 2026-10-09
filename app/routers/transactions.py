@@ -32,6 +32,9 @@ def create_transaction(
     origin = accounts_dict.get(data.origin_account_id)
     destination = accounts_dict.get(data.destination_account_id)
 
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
+    
     if not origin or not destination:
         raise HTTPException(status_code=404, detail="Cuenta origen o destino no encontrada")
 
