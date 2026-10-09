@@ -8,16 +8,15 @@ from app.models.alert import Alert
 
 def evaluate_transaction(db: Session, transaction: Transaction) -> list[Alert]:
     """Evalúa una transacción contra todas las reglas activas y crea alertas si corresponde."""
-    active_rules = db.query(RiskRule).filter(RiskRule.active == True).all()
-    triggered_alerts = []
+    active_rules = db.query(RiskRule).filter(RiskRule.active.is_(True)).all()
+    triggered_alerts: list[Alert] = []
 
     for rule in active_rules:
         if _rule_triggers(db, rule, transaction):
-            severity = _calculate_severity(rule, transaction)
             alert = Alert(
                 transaction_id=transaction.id,
                 rule_id=rule.id,
-                severity=severity,
+                severity=_calculate_severity(rule, transaction),
             )
             db.add(alert)
             triggered_alerts.append(alert)
@@ -36,7 +35,8 @@ def _rule_triggers(db: Session, rule: RiskRule, transaction: Transaction) -> boo
         return transaction.amount >= rule.threshold
 
     if rule.name == "frecuencia_sospechosa":
-        window_start = datetime.now(timezone.utc) - timedelta(minutes=10)
+        window_start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+
         count = (
             db.query(Transaction)
             .filter(
