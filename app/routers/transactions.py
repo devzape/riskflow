@@ -19,18 +19,18 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    origin = (
+    # Consultar y bloquear ambas filas en un solo paso (previene Race Conditions y Deadlocks)
+    accounts = (
         db.query(Account)
-        .filter(Account.id == data.origin_account_id)
+        .filter(Account.id.in_([data.origin_account_id, data.destination_account_id]))
         .with_for_update()
-        .first()
+        .all()
     )
-    destination = (
-        db.query(Account)
-        .filter(Account.id == data.destination_account_id)
-        .with_for_update()
-        .first()
-    )
+
+    # Convertir la lista en un diccionario para asignar origen y destino fácilmente
+    accounts_dict = {acc.id: acc for acc in accounts}
+    origin = accounts_dict.get(data.origin_account_id)
+    destination = accounts_dict.get(data.destination_account_id)
 
     if not origin or not destination:
         raise HTTPException(status_code=404, detail="Cuenta origen o destino no encontrada")
